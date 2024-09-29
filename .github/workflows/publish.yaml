@@ -1,40 +1,76 @@
-name: Generate NASA APOD Page
+name: Deploy NASA APOD Site to Pages
 
 on:
-  schedule:
-    - cron: "0 3 * * *"  # Runs daily at 3 AM UTC
   push:
     branches:
       - main
+    paths-ignore:
+      - "images/**"
+      - "LICENSE"
+      - "README.md"
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 3 * * *'  # Runs at 3 AM UTC every day
+
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
+  # Build job
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          submodules: recursive
+          fetch-depth: 0
 
-      - name: Restore dependencies
-        run: dotnet restore
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
 
-      - name: Build application
-        run: dotnet build --configuration Release
-
-      - name: Run APOD generator
-        run: dotnet run
-
-      - name: Deploy to GitHub Pages
+      - name: Fetch NASA APOD Data and Generate HTML
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git checkout --orphan gh-pages
-          git --work-tree=output add --all
-          git --work-tree=output commit -m "Update NASA APOD page"
-          git push origin HEAD:gh-pages --force
+          dotnet restore
+          dotnet run
+
+      - name: Create public folder
+        run: mkdir -p public
+
+      - name: Copy APOD files to public folder
+        run: |
+          cp -r output/* ./public/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+  # Deployment job
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
