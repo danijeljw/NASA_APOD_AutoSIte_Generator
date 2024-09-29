@@ -1,0 +1,40 @@
+name: Generate NASA APOD Page
+
+on:
+  schedule:
+    - cron: "0 3 * * *"  # Runs daily at 3 AM UTC
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build application
+        run: dotnet build --configuration Release
+
+      - name: Run APOD generator
+        run: dotnet run --project ./YourProjectName
+
+      - name: Deploy to GitHub Pages
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git checkout --orphan gh-pages
+          git --work-tree=output add --all
+          git --work-tree=output commit -m "Update NASA APOD page"
+          git push origin HEAD:gh-pages --force
